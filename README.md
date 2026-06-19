@@ -18,10 +18,9 @@ The first version is focused on circular objects because this is the most common
 - edge clearance / border gap
 - visual preview
 - closest-pair check
-- selectable dim dash-dot guide for object + gap zones
-- selectable dim dash-dot guide for the center field after edge clearance
+- selectable dim dash-dot guide for full object gap envelopes
+- selectable dim dash-dot guide for the edge clearance rectangle
 - AutoCAD-safe R12 DXF export
-- coordinate copy
 
 ## Preview legend
 
@@ -29,28 +28,48 @@ The first version is focused on circular objects because this is the most common
 white rectangle = real sheet border
 red circles = actual objects / cut circles
 yellow line = closest pair / minimum-distance check
-dim dash-dot circles = object + required gap zone
-dim dash-dot rectangle = allowed center field after edge clearance
+dim dash-dot circles = full object gap envelope
+dim dash-dot rectangle = edge clearance from sheet border
 ```
 
-The dim dash-dot rectangle is not a milling path. It only shows where object centers are allowed.
+The dim dash-dot rectangle is not a milling path. If edge clearance is set to 7 mm, the rectangle is drawn exactly 7 mm from each sheet border.
+
+The dim dash-dot circles show the full object gap envelope:
+
+```text
+gap envelope radius = object radius + gap
+```
 
 Example:
 
 ```text
 object diameter = 64 mm
+object radius = 32 mm
+gap = 4.5 mm
 edge clearance = 7 mm
-center margin = 32 + 7 = 39 mm
 ```
 
-So object centers must stay inside:
+Then the object center must be at least:
 
 ```text
-x = 39 ... 561
-y = 39 ... 261
+32 + 4.5 + 7 = 43.5 mm
 ```
 
-for a 600 x 300 mm sheet.
+from each sheet border.
+
+For a 600 x 300 mm sheet, the allowed centers are inside:
+
+```text
+x = 43.5 ... 556.5
+y = 43.5 ... 256.5
+```
+
+The visible edge-clearance rectangle itself is still drawn at:
+
+```text
+x = 7 ... 593
+y = 7 ... 293
+```
 
 ## Build
 

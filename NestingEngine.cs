@@ -37,7 +37,7 @@ public static class NestingEngine
         Validate(input);
 
         double radius = input.ObjectDiameter / 2.0;
-        double margin = radius + input.EdgeClearance;
+        double margin = radius + input.ObjectGap + input.EdgeClearance;
         double minCenterDistance = input.ObjectDiameter + input.ObjectGap;
         double innerW = input.PlateWidth - 2.0 * margin;
         double innerH = input.PlateHeight - 2.0 * margin;

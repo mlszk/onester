@@ -1,8 +1,6 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Globalization;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace Onester;
@@ -19,7 +17,7 @@ public sealed class MainForm : Form
 
     private readonly CheckBox _showGapZones = new()
     {
-        Text = "Show object + gap zones",
+        Text = "Show full object gap envelope",
         Checked = false,
         AutoSize = true,
         Dock = DockStyle.Fill
@@ -27,7 +25,7 @@ public sealed class MainForm : Form
 
     private readonly CheckBox _showCenterField = new()
     {
-        Text = "Show center field after edge clearance",
+        Text = "Show edge clearance rectangle",
         Checked = true,
         AutoSize = true,
         Dock = DockStyle.Fill
@@ -35,6 +33,7 @@ public sealed class MainForm : Form
 
     private readonly Label _status = new();
     private readonly DrawingPanel _drawingPanel = new();
+
     private NestingResult? _result;
 
     public MainForm()
@@ -45,7 +44,12 @@ public sealed class MainForm : Form
         Width = 1180;
         Height = 760;
 
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1
+        };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 340));
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         Controls.Add(root);
@@ -55,7 +59,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Padding = new Padding(12),
             ColumnCount = 2,
-            RowCount = 14
+            RowCount = 0
         };
         left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
         left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
@@ -66,45 +70,30 @@ public sealed class MainForm : Form
         AddInputRow(left, "Gap between objects", _gap);
         AddInputRow(left, "Edge clearance / border gap", _edge);
 
-        left.Controls.Add(_showGapZones, 0, 6);
-        left.SetColumnSpan(_showGapZones, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+        AddFullRow(left, _showGapZones, 30);
+        AddFullRow(left, _showCenterField, 30);
 
-        left.Controls.Add(_showCenterField, 0, 7);
-        left.SetColumnSpan(_showCenterField, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-
-        var calculate = new Button { Text = "Calculate", Dock = DockStyle.Fill, Height = 34 };
+        var calculate = new Button { Text = "Calculate", Dock = DockStyle.Fill };
         calculate.Click += (_, _) => Calculate();
+        AddFullRow(left, calculate, 38);
 
-        var export = new Button { Text = "Export DXF", Dock = DockStyle.Fill, Height = 34 };
+        var export = new Button { Text = "Export DXF", Dock = DockStyle.Fill };
         export.Click += (_, _) => ExportDxf();
+        AddFullRow(left, export, 38);
 
-        var copy = new Button { Text = "Copy coordinates", Dock = DockStyle.Fill, Height = 34 };
-        copy.Click += (_, _) => CopyCoordinates();
+        var resultBox = new GroupBox
+        {
+            Text = "Result",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8)
+        };
 
-        left.Controls.Add(calculate, 0, 8);
-        left.SetColumnSpan(calculate, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-
-        left.Controls.Add(export, 0, 9);
-        left.SetColumnSpan(export, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-
-        left.Controls.Add(copy, 0, 10);
-        left.SetColumnSpan(copy, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
-
-        var resultBox = new GroupBox { Text = "Result", Dock = DockStyle.Fill, Padding = new Padding(8) };
         _status.Dock = DockStyle.Fill;
         _status.AutoSize = false;
         _status.TextAlign = ContentAlignment.TopLeft;
         _status.Font = new Font(FontFamily.GenericSansSerif, 9.0f);
         resultBox.Controls.Add(_status);
-
-        left.Controls.Add(resultBox, 0, 11);
-        left.SetColumnSpan(resultBox, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 145));
+        AddFullRow(left, resultBox, 120);
 
         var legend = new Label
         {
@@ -116,12 +105,17 @@ public sealed class MainForm : Form
                 "white = sheet border\n" +
                 "red = object/circle\n" +
                 "yellow = closest pair\n" +
-                "dim dash-dot = selectable guide lines",
+                "dim dash-dot circles = full object gap envelope\n" +
+                "dim dash-dot rectangle = edge clearance from sheet border",
             ForeColor = SystemColors.ControlDarkDark
         };
-        left.Controls.Add(legend, 0, 12);
-        left.SetColumnSpan(legend, 2);
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 95));
+        AddFullRow(left, legend, 120);
+
+        // Flexible spacer keeps controls at the top and prevents any button from stretching.
+        int spacerRow = left.RowCount++;
+        left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        left.Controls.Add(new Panel { Dock = DockStyle.Fill }, 0, spacerRow);
+        left.SetColumnSpan(left.GetControlFromPosition(0, spacerRow), 2);
 
         _drawingPanel.Dock = DockStyle.Fill;
         _drawingPanel.BackColor = Color.FromArgb(34, 34, 34);
@@ -162,8 +156,24 @@ public sealed class MainForm : Form
     {
         int row = panel.RowCount++;
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-        panel.Controls.Add(new Label { Text = label, AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, row);
+
+        panel.Controls.Add(new Label
+        {
+            Text = label,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, row);
+
         panel.Controls.Add(control, 1, row);
+    }
+
+    private static void AddFullRow(TableLayoutPanel panel, Control control, int height)
+    {
+        int row = panel.RowCount++;
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+        panel.Controls.Add(control, 0, row);
+        panel.SetColumnSpan(control, 2);
     }
 
     private void Calculate()
@@ -192,11 +202,10 @@ public sealed class MainForm : Form
             }
 
             _status.Text =
-                $"Count: {_result.Circles.Count} pcs\r\n" +
-                $"Pattern: {_result.PatternName}\r\n" +
+                $"Count: {_result.Circles.Count} pcs    Pattern: {_result.PatternName}\r\n" +
                 $"Minimum gap: {_result.MinimumObjectGap:0.###} mm\r\n" +
-                $"Edge clearance: {input.EdgeClearance:0.###} mm\r\n" +
-                $"Sheet: {input.PlateWidth:0.###} × {input.PlateHeight:0.###} mm";
+                $"Edge clear: {input.EdgeClearance:0.###} mm    Object-border: {(input.EdgeClearance + input.ObjectGap):0.###} mm\r\n" +
+                $"Sheet: {input.PlateWidth:0.###} × {input.PlateHeight:0.###} mm    Object Ø: {input.ObjectDiameter:0.###} mm";
         }
         catch (Exception ex)
         {
@@ -218,7 +227,8 @@ public sealed class MainForm : Form
             FileName = $"onester-{_result.Circles.Count}pcs.dxf"
         };
 
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+            return;
 
         try
         {
@@ -229,17 +239,6 @@ public sealed class MainForm : Form
         {
             MessageBox.Show(this, ex.Message, "Export error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }
-
-    private void CopyCoordinates()
-    {
-        if (_result == null || _result.Circles.Count == 0) return;
-
-        var lines = _result.Circles
-            .Select(c => $"{c.X.ToString("0.###", CultureInfo.InvariantCulture)}, {c.Y.ToString("0.###", CultureInfo.InvariantCulture)}");
-
-        Clipboard.SetText(string.Join(Environment.NewLine, lines));
-        MessageBox.Show(this, "Coordinates copied to clipboard.", "Copy coordinates", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private sealed class DrawingPanel : Panel
@@ -260,17 +259,20 @@ public sealed class MainForm : Form
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.Clear(BackColor);
 
-            if (Result == null) return;
+            if (Result == null)
+                return;
 
             var input = Result.Input;
-            if (input.PlateWidth <= 0 || input.PlateHeight <= 0) return;
+            if (input.PlateWidth <= 0 || input.PlateHeight <= 0)
+                return;
 
             float pad = 48;
             float scale = Math.Min(
                 (ClientSize.Width - 2 * pad) / (float)input.PlateWidth,
                 (ClientSize.Height - 2 * pad) / (float)input.PlateHeight);
 
-            if (scale <= 0 || float.IsInfinity(scale)) return;
+            if (scale <= 0 || float.IsInfinity(scale))
+                return;
 
             float ox = (ClientSize.Width - (float)input.PlateWidth * scale) / 2;
             float oy = (ClientSize.Height + (float)input.PlateHeight * scale) / 2;
@@ -293,11 +295,15 @@ public sealed class MainForm : Form
             e.Graphics.DrawRectangle(borderPen, sheetRect.X, sheetRect.Y, sheetRect.Width, sheetRect.Height);
 
             double objectRadius = input.ObjectDiameter / 2.0;
-            double gapZoneRadius = (input.ObjectDiameter + input.ObjectGap) / 2.0;
+            double gapZoneRadius = objectRadius + input.ObjectGap;
 
             if (ShowGapZones)
             {
-                using var gapPen = new Pen(Color.FromArgb(90, 245, 200, 80), 1.0f) { DashStyle = DashStyle.DashDot };
+                using var gapPen = new Pen(Color.FromArgb(130, 245, 200, 80), 1.05f)
+                {
+                    DashStyle = DashStyle.DashDot
+                };
+
                 foreach (CircleItem c in Result.Circles)
                 {
                     var center = ToScreen(c.X, c.Y);
@@ -306,21 +312,29 @@ public sealed class MainForm : Form
                 }
             }
 
-            if (ShowCenterField)
-            {
-                double m = objectRadius + input.EdgeClearance;
-                var sm0 = ToScreen(m, m);
-                var sm1 = ToScreen(input.PlateWidth - m, input.PlateHeight - m);
-                var centerFieldRect = RectangleF.FromLTRB(sm0.X, sm1.Y, sm1.X, sm0.Y);
-                using var fieldPen = new Pen(Color.FromArgb(105, 120, 210, 120), 1.0f) { DashStyle = DashStyle.DashDot };
-                e.Graphics.DrawRectangle(fieldPen, centerFieldRect.X, centerFieldRect.Y, centerFieldRect.Width, centerFieldRect.Height);
-            }
-
             foreach (CircleItem c in Result.Circles)
             {
                 var center = ToScreen(c.X, c.Y);
                 float rr = (float)(objectRadius * scale);
                 e.Graphics.DrawEllipse(objectPen, center.X - rr, center.Y - rr, 2 * rr, 2 * rr);
+            }
+
+            if (ShowCenterField)
+            {
+                // Visual edge-clearance rectangle:
+                // if edge clearance is 7 mm, this rectangle is exactly 7 mm from each sheet border.
+                // It shows where the outer boundary of the object+gap envelope is allowed.
+                double edge = input.EdgeClearance;
+                var sm0 = ToScreen(edge, edge);
+                var sm1 = ToScreen(input.PlateWidth - edge, input.PlateHeight - edge);
+                var edgeClearanceRect = RectangleF.FromLTRB(sm0.X, sm1.Y, sm1.X, sm0.Y);
+
+                using var edgePen = new Pen(Color.FromArgb(190, 120, 220, 120), 1.6f)
+                {
+                    DashStyle = DashStyle.DashDot
+                };
+
+                e.Graphics.DrawRectangle(edgePen, edgeClearanceRect.X, edgeClearanceRect.Y, edgeClearanceRect.Width, edgeClearanceRect.Height);
             }
 
             string title = Result.Circles.Count > 0

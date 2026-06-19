@@ -151,3 +151,5 @@ newnew.zip
 ```
 
 Use boring versioned names.
+
+- Gap envelope and edge clearance logic corrected: edge clearance now keeps the full object+gap envelope inside the sheet.
